@@ -17,7 +17,6 @@ jp = JointPosition()
 jp.position = []
 jp.joint_name = []
 
-
 #クオータニオン導出
 def euler_to_quaternion(role, pitch, yaw):
 	q = quaternion_from_euler(role, pitch, yaw)
@@ -68,7 +67,6 @@ def main():
     arm.set_max_velocity_scaling_factor(0.2)
     arm.go(joint_goal, wait=True)
 
-# Aruco Pose2
     rospy.loginfo("Aruco Pose2")
     print("arm current pose states:", arm.get_current_pose().pose)
     q = tf.transformations.quaternion_from_euler(0.0, -3.14, 1.57)
@@ -83,7 +81,6 @@ def main():
     rospy.sleep(3)
 
     gripper(-0.7)
-
     # wait
     rospy.sleep(3.0)
 
@@ -98,7 +95,6 @@ def main():
     arm.go(joint_goal, wait=True)
 
     print("Finish!")
-
 
 if __name__ == '__main__':
 
