@@ -53,9 +53,6 @@ R_tree = []
 # 変換行列と回転行列の初期化
 R_joint = np.identity(4)
 R_link = np.identity(4)
-#config
-reference_transformation_ID = 1
-result_transformation_ID = 3
 
 # 表示する深さを指定
 display_depth = 7  # 例として7としていますが、必要に応じて変更してください
@@ -392,7 +389,7 @@ def compute_rotation_matrix(rpy):
 
 def matrix_calculation(Rs) :
     result = Rs[0]
-    for i in range(reference_transformation_ID,result_transformation_ID):
+    for i in range(self._reference_transformation_ID,self._result_transformation_ID = [1]):
         result = np.dot(result, Rs[i])#変換行列導出
     return result	
 
