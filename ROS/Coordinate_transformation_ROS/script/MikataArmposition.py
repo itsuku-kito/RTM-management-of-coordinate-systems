@@ -109,48 +109,7 @@ def position1(data):
     # Compute Cartesian path
     (plan, fraction) = arm.compute_cartesian_path([pose_target_1, pose_target_2], 0.01, 0.0)
     
-    """
-    joint_goal = PoseStamped()
-    joint_goal.pose.position.x = data.data[0]
-    joint_goal.pose.position.y = data.data[1]
-    joint_goal.pose.position.z = data.data[2]
-    joint_goal.pose.orientation.x = quat[0]
-    joint_goal.pose.orientation.y = quat[1]
-    joint_goal.pose.orientation.z = quat[2]
-    joint_goal.pose.orientation.w = quat[3]
-    
 
-    
-    joint_goal = PoseStamped()
-    joint_goal.pose.position.x = 0.341
-    joint_goal.pose.position.y = -0.093
-    joint_goal.pose.position.z = 0.108
-    joint_goal.pose.orientation.x = quat[0]
-    joint_goal.pose.orientation.y = quat[1]
-    joint_goal.pose.orientation.z = quat[2]
-    joint_goal.pose.orientation.w = quat[3]
-    arm.set_pose_target(joint_goal)
-    arm.go()
-    print("arm current pose states:", arm.get_current_pose().pose)
-    print ("Pick Pose Finished")
-    
-    
-    #arm.set_position_target([0.341,-0.0933,0.1087])
-    #arm.set_position_target([data.data[0],data.data[1],data.data[2]])
-
-    arm.go()
-    print ("Pick Pose Finished")
-    
-    rospy.loginfo("Start Pose")
-    joint_goal = arm.get_current_joint_values()
-    joint_goal[0] = 0
-    joint_goal[1] = 0
-    joint_goal[2] = 0
-    joint_goal[3] = 0
-    joint_goal[4] = 0.0
-    joint_goal[5] = 0.0
-    arm.go(joint_goal, wait=True)
-    """
     print ("Start Pose Finished")
        
 if __name__ == '__main__':
