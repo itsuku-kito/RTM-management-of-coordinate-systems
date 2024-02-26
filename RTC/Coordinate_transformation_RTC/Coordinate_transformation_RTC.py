@@ -18,11 +18,7 @@ import sys
 import time
 import datetime
 
-import xml.etree.ElementTree as ET
-import numpy as np
-import pyquaternion
-from pyquaternion import Quaternion
-from anytree import Node, RenderTree
+
 sys.path.append(".")
 
 # Import RTM module
@@ -36,22 +32,9 @@ import arUco
 
 # </rtc-template>
  #URDFファイルを指定
-tree = ET.parse('open_manipulator.urdf')#読み込むURDFファイルの名前に変更
-root = tree.getroot()
 
 
-# すでに表示したジョイントの名前を格納するセット
-displayed_joint_names = set()
-# リストを格納するための変数
-joint_data = []
-link_data = []
-R_links = []
-R_joints =[]
-joint_datas = []
-R_tree = []
-# 変換行列と回転行列の初期化
-R_joint = np.identity(4)
-R_link = np.identity(4)
+
 
 
 # 表示する深さを指定
@@ -213,7 +196,11 @@ class Coordinate_transformation_RTC(OpenRTM_aist.DataFlowComponentBase):
     #
     #
     def onActivated(self, ec_id):
-    
+
+        xml_file_path = 'open_manipulator.urdf'
+        # XMLファイルを読み込む
+        tree = ET.parse(xml_file_path)
+        root_element = tree.getroot()
         return RTC.RTC_OK
 	
     ##
@@ -241,18 +228,24 @@ class Coordinate_transformation_RTC(OpenRTM_aist.DataFlowComponentBase):
     def onExecute(self, ec_id):
 
         #１
+        # インスタンスを生成してXMLを解析し、ツリーを構築して表示する
+        robot_model = RobotModel()
+        robot_model.parse_xml_and_create_joints(root_element)
+        tree_dict = robot_model.build_joint_tree()
+        root_joint = robot_model.joint_datas[0]
+        root_node_name = root_joint.name
+        root_node = tree_dict[root_node_name]
+        # ツリーを表示する
+        print("Joint Tree:")
+        robot_model.display_tree(root_node)
+
         
         if self._pre_transformation_coordinates1In.isNew() :
             print("Received Maker")
+            #入力位置
             pose = self._pre_transformation_coordinates1In.read()
-            print(pose)
             
-            pose_X = pose.translates[0].x
-            pose_Y = pose.translates[0].y
-            pose_Z = pose.translates[0].z
-
-            poseIn = np.array([pose_X,pose_Y,pose_Z,1],dtype = "float")#入力データ
-            print(poseIn)
+            poseIn = np.array([pose.translates[0].x, pose.translates[0].y, pose.translates[0].z, 1], dtype="float")
             
             display_links_and_joints(root)
 
@@ -283,14 +276,9 @@ class Coordinate_transformation_RTC(OpenRTM_aist.DataFlowComponentBase):
         if self._pre_transformation_coordinates2In.isNew() :
             
             pose = self._pre_transformation_coordinates2In.read()
-            
-            
-            pose_X = pose.translates[0].x
-            pose_Y = pose.translates[0].y
-            pose_Z = pose.translates[0].z
 
-            poseIn = np.array([pose_X,pose_Y,pose_Z,1],dtype = "float")#入力データ
-            
+            poseIn = np.array([pose.data.x, pose.data.y, pose.data[0].z, 1], dtype="float")
+
             display_links_and_joints(root)
 
             tree_dict = check_matching_child_parent(joint_datas)
@@ -382,89 +370,90 @@ class Coordinate_transformation_RTC(OpenRTM_aist.DataFlowComponentBase):
     #def onRateChanged(self, ec_id):
     #
     #    return RTC.RTC_OK
-	
-def display_links_and_joints(element, indentation=""):
-    if element.tag == 'joint':
-        display_joint_information(element)
-    for child in element:
-        display_links_and_joints(child, indentation + "  ")
+import numpy as np
+import xml.etree.ElementTree as ET
+from anytree import Node, RenderTree
 
-def display_joint_information(element):
+class Joint:
+    def __init__(self, name, parent_name, child_name, rotation_matrix):
+        self.name = name
+        self.parent_name = parent_name
+        self.child_name = child_name
+        self.rotation_matrix = rotation_matrix
+
+class RobotModel:
+    def __init__(self):
+        self.joint_datas = []
+        self.displayed_joint_names = set()
+    def parse_xml_and_create_joints(self, root_element):
+        """XMLを解析し、ジョイントオブジェクトを作成してリストに格納する"""
+        self._parse_and_extract_joints(root_element)
+    def _parse_and_extract_joints(self, element):
+        """XML要素を再帰的に処理し、ジョイント情報を抽出する"""
+        if element.tag == 'joint':
+            self._extract_joint_information(element)
+        for child in element:
+            self._parse_and_extract_joints(child)
+    def _extract_joint_information(self, element):
+        """ジョイント情報を抽出してジョイントオブジェクトを作成し、リストに追加する"""
         joint_name = element.attrib.get('name', 'N/A')
-        rpy = None  # rpyを初期化
-        if joint_name not in displayed_joint_names:
-            displayed_joint_names.add(joint_name)#jointの名前取得
+        if joint_name not in self.displayed_joint_names:
+            self.displayed_joint_names.add(joint_name)
             parent_link = element.find('./parent')
             child_link = element.find('./child')
-            parent_name = parent_link.attrib.get('link', 'N/A')#親リンク取得
-            child_name = child_link.attrib.get('link', 'N/A')#子リンク取得
+            parent_name = parent_link.attrib.get('link', 'N/A')
+            child_name = child_link.attrib.get('link', 'N/A')
             if parent_link is not None and child_link is not None:
                 origin = element.find('./origin')
                 axis = element.find('./axis')
                 if origin is not None:
-                    joint_rpy_str = origin.get('rpy', 'N/A')#rpy取得
-                    joint_xyz_str = origin.get('xyz', 'N/A')#xyz取得
+                    joint_rpy_str = origin.get('rpy', 'N/A')
+                    joint_xyz_str = origin.get('xyz', 'N/A')
                     joint_rpy = [float(val) for val in joint_rpy_str.split()] if joint_rpy_str != 'N/A' else None
                     joint_xyz = [float(val) for val in joint_xyz_str.split()] if joint_xyz_str != 'N/A' else None
-                    if axis is not None:
-                       rpy_str = axis.get('xyz', 'N/A')
-                       rpy = [float(val) for val in rpy_str.split()] if rpy_str != 'N/A' else None
-            rotation_matrix = compute_rotation_matrix(joint_rpy)#回転行列取得
-            R_joint[:3, :3] = rotation_matrix
-            R_joint[:3, 3] = joint_xyz
-            joint_data = ([joint_name, parent_name, child_name, joint_rpy, joint_xyz, np.copy(R_joint)])
-            joint_datas.append(joint_data)
-        
-        return True
+                else:
+                    joint_rpy = None
+                    joint_xyz = None
+                rotation_matrix = self._compute_rotation_matrix(joint_rpy)
+                joint_data = Joint(joint_name, parent_name, child_name, rotation_matrix)
+                self.joint_datas.append(joint_data)
 
-def compute_rotation_matrix(rpy):
-    roll, pitch, yaw = rpy
-    return np.array([
-        [np.cos(yaw) * np.cos(pitch), np.cos(yaw) * np.sin(pitch) * np.sin(roll) - np.sin(yaw) * np.cos(roll), np.cos(yaw) * np.sin(pitch) * np.cos(roll) + np.sin(yaw) * np.sin(roll)],
-        [np.sin(yaw) * np.cos(pitch), np.sin(yaw) * np.sin(pitch) * np.sin(roll) + np.cos(yaw) * np.cos(roll), np.sin(yaw) * np.sin(pitch) * np.cos(roll) - np.cos(yaw) * np.sin(roll)],
-        [-np.sin(pitch), np.cos(pitch) * np.sin(roll), np.cos(pitch) * np.cos(roll)]
-    ])
+    def _compute_rotation_matrix(self, rpy):
+        """与えられたRPY角から回転行列を計算する"""
+        if rpy is None:
+            return np.identity(3)
+        roll, pitch, yaw = rpy
+        return np.array([
+            [np.cos(yaw) * np.cos(pitch), np.cos(yaw) * np.sin(pitch) * np.sin(roll) - np.sin(yaw) * np.cos(roll), np.cos(yaw) * np.sin(pitch) * np.cos(roll) + np.sin(yaw) * np.sin(roll)],
+            [np.sin(yaw) * np.cos(pitch), np.sin(yaw) * np.sin(pitch) * np.sin(roll) + np.cos(yaw) * np.cos(roll), np.sin(yaw) * np.sin(pitch) * np.cos(roll) - np.cos(yaw) * np.sin(roll)],
+            [-np.sin(pitch), np.cos(pitch) * np.sin(roll), np.cos(pitch) * np.cos(roll)]
+        ])
 
-def matrix_calculation(Rs) :
-    result = Rs[0]
-    for i in range(0,1):
-        result = np.dot(result, Rs[i])#変換行列導出
-    return result	
-
-def check_matching_child_parent(joint_datas):
-    # ツリーを格納する辞書
-    tree_dict = {}
-
-    for i in range(len(joint_datas)):
-        child_name = joint_datas[i][1]  # i番目のジョイントの子リンクの名前
-        for j in range(len(joint_datas)):
-            if i != j:
-                if child_name == joint_datas[j][2]:
-                    parent_name = joint_datas[j][0]
-                    child_name = joint_datas[i][0]
-
-                    # 親ノードがまだ辞書に存在しない場合、新しくノードを作成
+    def build_joint_tree(self):
+        """親子関係に基づいてジョイントのツリーを構築する"""
+        tree_dict = {}
+        for joint_data in self.joint_datas:
+            child_name = joint_data.parent_name
+            for parent_joint_data in self.joint_datas:
+                if child_name == parent_joint_data.child_name:
+                    parent_name = parent_joint_data.name
                     if parent_name not in tree_dict:
-                        tree_dict[parent_name] = Node(joint_datas[j][5])
+                        #tree_dict[parent_name] = Node(parent_joint_data.rotation_matrix)
+                        tree_dict[parent_name] = Node(parent_joint_data.name)
+                    if joint_data.name not in tree_dict:
+                        tree_dict[joint_data.name] = Node(joint_data.name, parent=tree_dict[parent_name])
+        return tree_dict
+    def display_tree(self, root_node):
+        """ツリーを表示する"""
+        for pre, fill, node in RenderTree(root_node):
+            print(f"{pre}{node.name}")
 
-                    # 子ノードを親ノードの下に追加
-                    if child_name not in tree_dict:
-                        tree_dict[child_name] = Node(joint_datas[i][5], parent=tree_dict[parent_name])
-    return tree_dict
-
-# ツリーの表示
-def display_tree(root_node):
-    for pre, fill, node in RenderTree(root_node):
-        print(f"{pre}{node.name}")
-
-def display_children(node, depth, current_depth=0):
-    if current_depth <= depth:
-        print("  " * current_depth, node.name)
-
-        R_tree.append(node.name)
-
-        for child in node.children:
-            display_children(child, depth, current_depth + 1)
+    def display_children(self, node, depth, current_depth=0):
+        """指定された深さまでの子ノードを表示する"""
+        if current_depth <= depth:
+            print("  " * current_depth, node.name)
+            for child in node.children:
+                self.display_children(child, depth, current_depth + 1)
 
 
 def Coordinate_transformation_RTCInit(manager):
